@@ -27,6 +27,12 @@ bool initialize_window(void) {
 		fprintf(stderr, "Error initializing SDL.\n");
 		return false;
 	}
+
+	// Bruke SDL til å spørre hva er fullscreen max bredde og høyde på monitor
+	SDL_DisplayMode display_mode;
+	SDL_GetCurrentDisplayMode(0, &display_mode);
+	window_width = display_mode.w;
+	window_height = display_mode.h;
 	
 	// Create a SDL window
 	window = SDL_CreateWindow(
@@ -48,6 +54,7 @@ bool initialize_window(void) {
 		fprintf(stderr, "Error creating SDL renderer.\n");
 		return false;
 	}
+	SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
 
 	return true;
 }
@@ -95,6 +102,17 @@ void clear_color_buffer(uint32_t color) {
 	}
 }
 
+
+void draw_grid(void) {
+	for (int y = 10; y < window_height - 10; y++) {
+		for (int x = 10; x < window_width - 10; x++) {
+			if ((y % 10 != 0 && x % 10 == 0) || y % 10 == 0) {
+				color_buffer[(window_width * y) + x] = 0xFF333333; // Gray
+			} 		
+		}
+	}
+}
+
 void render_color_buffer(void) {
 	// Oppdatere texturen med ny pixel data (fargebufferet)
 	SDL_UpdateTexture(
@@ -111,10 +129,12 @@ void render(void) {
 	SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
 	SDL_RenderClear(renderer);
 	
+	draw_grid();
+
 	render_color_buffer();
 
 	/* Vi rensker colorbufferen før hver frame rendres */
-	clear_color_buffer(0xFFFFFF00);
+	clear_color_buffer(0xFF000000);
 
 	SDL_RenderPresent(renderer);
 }
