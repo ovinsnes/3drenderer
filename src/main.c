@@ -104,11 +104,9 @@ void clear_color_buffer(uint32_t color) {
 
 
 void draw_grid(void) {
-	for (int y = 10; y < window_height - 10; y++) {
-		for (int x = 10; x < window_width - 10; x++) {
-			if ((y % 10 != 0 && x % 10 == 0) || y % 10 == 0) {
-				color_buffer[(window_width * y) + x] = 0xFF333333; // Gray
-			} 		
+	for (int y = 0; y < window_height; y += 10) {
+		for (int x = 0; x < window_width; x += 10) {
+			color_buffer[(window_width * y) + x] = 0xFF333333; // Gray
 		}
 	}
 }
