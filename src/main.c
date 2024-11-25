@@ -111,6 +111,14 @@ void draw_grid(void) {
 	}
 }
 
+void draw_rect(int x, int y, int width, int height, uint32_t color) {
+	for (int col = y; col < y + height; col++) {
+		for (int row = x; row < x + width; row++) {
+			color_buffer[(window_width * col) + row] = color; // Pink
+		}
+	}
+}
+
 void render_color_buffer(void) {
 	// Oppdatere texturen med ny pixel data (fargebufferet)
 	SDL_UpdateTexture(
@@ -129,10 +137,12 @@ void render(void) {
 	
 	draw_grid();
 
+	draw_rect(300, 150, 200, 100, 0xFFFFCCCC);
+
 	render_color_buffer();
 
 	/* Vi rensker colorbufferen før hver frame rendres */
-	clear_color_buffer(0xFF000000);
+	clear_color_buffer(0xFF000000); // Svart
 
 	SDL_RenderPresent(renderer);
 }
