@@ -56,7 +56,7 @@ void draw_grid(void) {
 }
 
 void draw_pixel(int x, int y, uint32_t color) {
-	if (x < window_width && y < window_height) {
+	if (x >= 0 && x < window_width && y >= 0 && y < window_height) {
 		color_buffer[(window_width * y) + x] = color;
 	}
 }
@@ -64,7 +64,7 @@ void draw_pixel(int x, int y, uint32_t color) {
 void draw_rect(int x, int y, int width, int height, uint32_t color) {
 	for (int col = y; col < y + height; col++) {
 		for (int row = x; row < x + width; row++) {
-			color_buffer[(window_width * col) + row] = color; // Pink
+			draw_pixel(row, col, color);
 		}
 	}
 }

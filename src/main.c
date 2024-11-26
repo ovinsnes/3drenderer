@@ -14,6 +14,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 const int N_POINTS = 9 * 9 * 9; // 729 punkter
 vec3_t cube_points[N_POINTS]; // 9x9x9 cube
+vec2_t projected_points[N_POINTS];
+
+float fov_factor = 120;
 
 bool is_running = false;
 
@@ -59,18 +62,43 @@ void process_input(void) {
 	}
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// Funksjon som mottar en 3D vektor og returnerer et projektert 2D punkt
+////////////////////////////////////////////////////////////////////////////////
+vec2_t project(vec3_t point) {
+	vec2_t projected_point = {
+		.x = (fov_factor * point.x),
+		.y = (fov_factor * point.y)
+	};
+	return projected_point;
+}
+
 void update(void) {
-	// TODO:
+	for (int i = 0; i < N_POINTS; i++) {
+		vec3_t point = cube_points[i];
+
+		// Prosjekter det nåværende punktet
+		vec2_t projected_point = project(point);
+
+		// Lagre den projekterte 2D vektoren i arrayet av projekterte punkter
+		projected_points[i] = projected_point;
+	}
 }
 
 void render(void) {
-	SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-	SDL_RenderClear(renderer);
-	
 	draw_grid();
 
-	draw_pixel(20, 20, 0xFFFF00FF);
-	draw_rect(300, 150, 200, 100, 0xFFFFCCCC);
+	// Loop gjennom og rendre alle projekterte punkter
+	for (int i = 0; i < N_POINTS; i++) {
+		vec2_t projected_point = projected_points[i];
+		draw_rect(
+				projected_point.x + (window_width / 2), 
+				projected_point.y + (window_height / 2), 
+				4, 
+				4, 
+				0xFFFFFF00
+		);
+	}
 
 	render_color_buffer();
 
