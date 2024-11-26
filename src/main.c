@@ -3,10 +3,17 @@
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 #include "display.h"
+#include "vector.h"
 	
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386) || defined(_M_IX86)
 #include <immintrin.h>
 #endif
+
+////////////////////////////////////////////////////////////////////////////////
+/// Declare an array of vectors/points
+////////////////////////////////////////////////////////////////////////////////
+const int N_POINTS = 9 * 9 * 9; // 729 punkter
+vec3_t cube_points[N_POINTS]; // 9x9x9 cube
 
 bool is_running = false;
 
@@ -22,6 +29,19 @@ void setup(void) {
 			window_width,
 			window_height
 	);
+
+	int point_count = 0;
+
+	// Begynne å laste vector arrayet
+	// Fra -1 til 1 (i 9x9x9 kuben)
+	for (float x = -1; x <= 1; x += 0.25) {
+		for (float y = -1; y <= 1; y += 0.25) {
+			for (float z = -1; z <= 1; z += 0.25) {
+				vec3_t new_point = { .x = x, .y = y, .z = z };
+				cube_points[point_count++] = new_point;
+			}
+		}
+	}
 }
 
 void process_input(void) {
