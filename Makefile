@@ -1,7 +1,7 @@
 all: build
 
 build:
-	gcc -Wall -std=c99 -arch arm64 src/main.c src/display.c \
+	gcc -Wall -std=c99 -arch arm64 src/*.c \
 	 -I/opt/homebrew/opt/sdl2/include -D_REENTRANT \
 	-L/opt/homebrew/opt/sdl2/lib -lSDL2 -o renderer
 
