@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 
-#define FPS 30
+#define FPS 120
 #define FRAME_TARGET_TIME (1000 / FPS) // How many ms each frame should take
 
 extern SDL_Renderer* renderer;

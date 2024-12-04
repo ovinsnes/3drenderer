@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 
+#include "array.h"
 #include "display.h"
 #include "vector.h"
 #include "mesh.h"
@@ -12,16 +13,24 @@
 #include <immintrin.h>
 #endif
 
-triangle_t triangles_to_render[N_MESH_FACES];
+////////////////////////////////////////////////////////////////////////////////
+// Array of triangles that should be rendered frame by frame
+////////////////////////////////////////////////////////////////////////////////
+triangle_t* triangles_to_render = NULL;
+
+////////////////////////////////////////////////////////////////////////////////
+// Global variables for execution status and game loop
+////////////////////////////////////////////////////////////////////////////////
+bool is_running = false;
+int previous_frame_time = 0;
 
 vec3_t camera_position = { .x = 0, .y = 0, .z = -5 };
 vec3_t cube_rotation = { .x = 0, .y = 0, .z = 0 };
-
 float fov_factor = 640;
 
-bool is_running = false;
-Uint32 previous_frame_time = 0;
-
+////////////////////////////////////////////////////////////////////////////////
+// Setup function to initialize variables and game objects
+////////////////////////////////////////////////////////////////////////////////
 void setup(void) {
 	// Alloker nødvendig antall bytes i minnet for fargebuffer
 	color_buffer = (uint32_t*) malloc(sizeof(uint32_t) * window_width * window_height);
@@ -64,6 +73,9 @@ void update(void) {
 	}
 
 	previous_frame_time = SDL_GetTicks(); // Number of ms since game has started
+	
+	// Initialize the array of triangles to render
+	triangles_to_render = NULL;
 
 	cube_rotation.x += 0.01; // Speed of rotation
 	cube_rotation.y += 0.01; // Speed of rotation
@@ -103,15 +115,20 @@ void update(void) {
 		}
 
 		// Save the transformed and projected triangle in the array of triangles to render
-		triangles_to_render[i] = projected_triangle;
+		array_push(triangles_to_render, projected_triangle);
 	}
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// Render function to draw objects on the display
+////////////////////////////////////////////////////////////////////////////////
 void render(void) {
 	draw_grid();
 
 	// Loop gjennom og rendre alle projekterte triangler (faces)
-	for (int i = 0; i < N_MESH_FACES; i++) {
+	int num_triangles = array_length(triangles_to_render);
+
+	for (int i = 0; i < num_triangles; i++) {
 		triangle_t face = triangles_to_render[i];
 
 		// Draw vertex points
@@ -130,6 +147,9 @@ void render(void) {
 				0xFF00FF00
 		);
 	}
+
+	// Clear the array of triangles to render every frame loop
+	array_free(triangles_to_render);
 
 	render_color_buffer();
 
