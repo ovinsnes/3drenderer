@@ -6,7 +6,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 /// Funksjon som mottar en 3D vektor og returnerer et projektert 2D punkt
 /// Vi trenger å bruke projeksjon for å vise et 3D objekt på en 2D skjermflate
-/// Orthographisk projeksjon
+/// Orthographisk projeksjon: alle sider er like lange uavhengig avstand til 
+/// kamera (ingen dybde eller perspektiv)
+/// Perspektiv projeksjon legger på dybde
 ////////////////////////////////////////////////////////////////////////////////
 vec2_t project(vec3_t v, float fov_factor) {
 	vec2_t projected_point = {

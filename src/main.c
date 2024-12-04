@@ -113,9 +113,22 @@ void render(void) {
 	// Loop gjennom og rendre alle projekterte triangler (faces)
 	for (int i = 0; i < N_MESH_FACES; i++) {
 		triangle_t face = triangles_to_render[i];
+
+		// Draw vertex points
 		draw_rect(face.points[0].x, face.points[0].y, 3, 3, 0xFFFFFF00);
 		draw_rect(face.points[1].x, face.points[1].y, 3, 3, 0xFFFFFF00);
 		draw_rect(face.points[2].x, face.points[2].y, 3, 3, 0xFFFFFF00);
+
+		// Draw unfilled triangle
+		draw_triangle(
+				face.points[0].x, 
+				face.points[0].y, 
+				face.points[1].x, 
+				face.points[1].y,
+				face.points[2].x, 
+				face.points[2].y,
+				0xFF00FF00
+		);
 	}
 
 	render_color_buffer();
