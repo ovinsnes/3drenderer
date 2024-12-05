@@ -1,4 +1,8 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/uio.h>
+#include <unistd.h>
 
 #include "mesh.h"
 #include "array.h"
@@ -51,3 +55,112 @@ void load_cube_mesh_data(void) {
 		array_push(mesh.faces, cube_face);
 	}
 }
+
+void load_obj_file_data(char* filename) {
+	// TODO: Read contents of .obj file
+	// and load the vertices and faces in
+	// out mesh.vertices and mesh.faces
+	FILE* f = fopen(filename, "r");
+	if (f == NULL) {
+		printf("Failed to open file\n");
+		exit(1);
+	}
+	char* buf = malloc(8192);
+
+	// Reading text file, line by line
+	while (feof(f) == 0) {
+		fgets(buf, 80, f);
+
+		// Reading and pushing vector onto global mesh
+		if ((char)buf[0] == 'v' && (char)buf[1] == ' ') {
+			char* vector_buf = malloc(80); // stores the char buffer for a float
+			int v_buf_index = 0;
+
+			vec3_t vertex = { .x = 0, .y = 0, .z = 0 };
+			int vertex_index = 0;
+
+			for (int i = 2; i < 80; i++) {
+				if (buf[i] == ' ' || buf[i] == '\0') { // store current vector in vertex
+					float v = atof(vector_buf);
+					if (vertex_index == 0) {
+						vertex.x = v;
+					} else if (vertex_index == 1) {
+						vertex.y = v;
+					} else if (vertex_index == 2) {
+						vertex.z = v;
+					}
+					vertex_index++;
+					free(vector_buf);
+					vector_buf = malloc(80);
+					v_buf_index = 0;
+					if (buf[i] == '\0') break; // reached EOL, reading newline
+					continue;
+				}
+				// Write char from buffer into vector_buffer
+				vector_buf[v_buf_index] = buf[i];
+				v_buf_index++;
+			}
+
+			free(vector_buf);
+			printf("Vertex to push onto mesh: (%f, %f, %f)\n", vertex.x, vertex.y, vertex.z);
+			// We push the current vector onto the mesh
+			array_push(mesh.vertices, vertex);
+			printf("Vertex pushed\n");
+		}
+
+		// Reading and pushing face onto global mesh
+		if (buf[0] == 'f') {
+			char* index_buf = malloc(80);
+			int i_buf_index = 0;
+
+			face_t face = { .a = 0, .b = 0, .c = 0 };
+			int face_index = 0;
+			int i = 2;
+			printf("Starting to read face line: %s\n", buf);
+			while (i < 80) {
+				if (buf[i] == '/') { // we skip the texture and normal indices
+					while (buf[i] != ' ') {
+						i++;
+					}
+				}
+				if (buf[i] == '\0') {
+					break;
+				}
+				if (buf[i] == ' ') { // store current index in face (vertex index)
+					int index = atoi(index_buf);
+					printf("Found whitespace, storing index: %d\n", index);
+					if (face_index == 0) {
+						face.a = index;
+						printf("Stored %d in face.a\n", face.a);
+					} else if (face_index == 1) {
+						face.b = index;
+						printf("Stored %d in face.b\n", face.b);
+					} else {
+						face.c = index;
+						printf("Stored %d in face.b\n", face.b);
+					}
+					face_index++;
+					free(index_buf);
+					index_buf = malloc(80);
+					i_buf_index = 0;
+					i++;
+					continue;
+				}
+
+				printf("Writing %c to face index buffer\n", buf[i]);
+				// Write char from buffer to the face index buffer
+				index_buf[i_buf_index] = buf[i];
+				i_buf_index++;
+				i++;
+				printf("i = %d\n", i);
+			}
+
+			// Push the current face onto the mesh
+			array_push(mesh.faces, face);
+		}
+	}
+	// Freeing up used resources
+	fclose(f);
+	free(buf);
+}
+
