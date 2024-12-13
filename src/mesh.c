@@ -57,9 +57,6 @@ void load_cube_mesh_data(void) {
 }
 
 void load_obj_file_data(char* filename) {
-	// TODO: Read contents of .obj file
-	// and load the vertices and faces in
-	// out mesh.vertices and mesh.faces
 	FILE* f = fopen(filename, "r");
 	if (f == NULL) {
 		printf("Failed to open file\n");
@@ -102,10 +99,8 @@ void load_obj_file_data(char* filename) {
 			}
 
 			free(vector_buf);
-			printf("Vertex to push onto mesh: (%f, %f, %f)\n", vertex.x, vertex.y, vertex.z);
 			// We push the current vector onto the mesh
 			array_push(mesh.vertices, vertex);
-			printf("Vertex pushed\n");
 		}
 
 		// Reading and pushing face onto global mesh
@@ -116,7 +111,6 @@ void load_obj_file_data(char* filename) {
 			face_t face = { .a = 0, .b = 0, .c = 0 };
 			int face_index = 0;
 			int i = 2;
-			printf("Starting to read face line: %s\n", buf);
 			while (i < 80) {
 				if (buf[i] == '/') { // we skip the texture and normal indices
 					while (buf[i] != ' ') {
@@ -128,16 +122,12 @@ void load_obj_file_data(char* filename) {
 				}
 				if (buf[i] == ' ') { // store current index in face (vertex index)
 					int index = atoi(index_buf);
-					printf("Found whitespace, storing index: %d\n", index);
 					if (face_index == 0) {
 						face.a = index;
-						printf("Stored %d in face.a\n", face.a);
 					} else if (face_index == 1) {
 						face.b = index;
-						printf("Stored %d in face.b\n", face.b);
 					} else {
 						face.c = index;
-						printf("Stored %d in face.b\n", face.b);
 					}
 					face_index++;
 					free(index_buf);
@@ -147,12 +137,10 @@ void load_obj_file_data(char* filename) {
 					continue;
 				}
 
-				printf("Writing %c to face index buffer\n", buf[i]);
 				// Write char from buffer to the face index buffer
 				index_buf[i_buf_index] = buf[i];
 				i_buf_index++;
 				i++;
-				printf("i = %d\n", i);
 			}
 
 			// Push the current face onto the mesh
