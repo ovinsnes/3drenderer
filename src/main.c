@@ -55,13 +55,6 @@ void setup(void) {
 	end = clock();
 	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 	printf("load_obj_data() took %f seconds to execute\n", cpu_time_used);
-
-
-	vec3_t a = { 2.5, 6.4, 3.0 };
-	vec3_t b = { -2.2, 1.4, 1.0 };
-
-	float a_length = vec3_length(a);
-	float b_length = vec3_length(b);
 }
 
 void process_input(void) {
@@ -145,18 +138,24 @@ void update(void) {
 			.y = transformed_vertices[2].y - transformed_vertices[0].y,
 			.z = transformed_vertices[2].z - transformed_vertices[0].z
 		};
+		vec3_normalize(&vec_BA);
+		vec3_normalize(&vec_CA);
 
 		// Finn kryssproduktet mellom dem (venstre-hånd koordinatsystem)
-		vec3_t vec_N = vec3_cross(vec_BA, vec_CA);
+		vec3_t normal = vec3_cross(vec_BA, vec_CA);
+		// Normaliser normalen for planet
+		vec3_normalize(&normal);
 
 		// Finn kamera strålevektoren
 		vec3_t camera_ray = vec3_sub(camera_position, transformed_vertices[0]);
 
 		// Punktproduktet mellom kamerastrålen og normalen N
-		float dot = vec3_dot(vec_N, camera_ray);
+		float dot = vec3_dot(normal, camera_ray);
+
+		bool apply_culling = true;
 
 		// Sjekk om flaten skal vises eller gjemmes bort
-		if (dot <= 0) {
+		if (dot <= 0 && apply_culling) {
 			continue;
 		}
 
@@ -185,6 +184,8 @@ void render(void) {
 
 	// Loop gjennom og rendre alle projekterte triangler (faces)
 	int num_triangles = array_length(triangles_to_render);
+
+	printf("%d faces rendered\n", num_triangles);
 
 	for (int i = 0; i < num_triangles; i++) {
 		triangle_t face = triangles_to_render[i];
