@@ -49,12 +49,19 @@ void setup(void) {
 
 	clock_t start, end;
 	double cpu_time_used;
+
 	start = clock();
-	load_obj_file_data("./assets/bunny.obj");
+	load_obj_file_data("./assets/diamond.obj");
 	end = clock();
 	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 	printf("load_obj_data() took %f seconds to execute\n", cpu_time_used);
 
+
+	vec3_t a = { 2.5, 6.4, 3.0 };
+	vec3_t b = { -2.2, 1.4, 1.0 };
+
+	float a_length = vec3_length(a);
+	float b_length = vec3_length(b);
 }
 
 void process_input(void) {
@@ -107,11 +114,13 @@ void update(void) {
 
 		triangle_t projected_triangle;
 
-		// Loop all 3 vertices of current face and apply transformations
+		vec3_t transformed_vertices[3];
+
+		// Loop all 3 vertices of current face and apply *transformations*
 		for (int j = 0; j < 3; j++) {
-			// Rotate the points 0.1 degrees around y-axis for every frame update
 			vec3_t transformed_vertex = face_vertices[j];
 
+			// Rotate the points 0.1 degrees around y-axis for every frame update
 			transformed_vertex = vec3_rotate_x(transformed_vertex, mesh.rotation.x);
 			transformed_vertex = vec3_rotate_y(transformed_vertex, mesh.rotation.y);
 			transformed_vertex = vec3_rotate_z(transformed_vertex, mesh.rotation.z);
@@ -119,8 +128,17 @@ void update(void) {
 			// Translate the vertex away from the camera in the z-plane
 			transformed_vertex.z -= camera_position.z;
 
+			// Lagre punktene i array for transformerte punkter
+			transformed_vertices[j] = transformed_vertex;
+		}
+
+		// TODO: Sjekk om flaten skal vises eller gjemmes bort
+		//
+
+		// Loop gjennom alle 3 punktene av den nåværende flaten og *projiser* dem
+		for (int j = 0; j < 3; j++) {
 			// Project the current vertex onto 2D space
-			vec2_t projected_point = project(transformed_vertex, fov_factor);
+			vec2_t projected_point = project(transformed_vertices[j], fov_factor);
 
 			// Scale and translate the projected points to the middle of the screen
 			projected_point.x += (window_width / 2);
