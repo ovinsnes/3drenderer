@@ -25,7 +25,7 @@ triangle_t* triangles_to_render = NULL;
 bool is_running = false;
 int previous_frame_time = 0;
 
-vec3_t camera_position = { .x = 0, .y = 0, .z = -5 };
+vec3_t camera_position = { .x = 0, .y = 0, .z = 0 };
 float fov_factor = 640;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -112,8 +112,6 @@ void update(void) {
 		face_vertices[1] = mesh.vertices[mesh_face.b - 1];
 		face_vertices[2] = mesh.vertices[mesh_face.c - 1];
 
-		triangle_t projected_triangle;
-
 		vec3_t transformed_vertices[3];
 
 		// Loop all 3 vertices of current face and apply *transformations*
@@ -126,14 +124,41 @@ void update(void) {
 			transformed_vertex = vec3_rotate_z(transformed_vertex, mesh.rotation.z);
 
 			// Translate the vertex away from the camera in the z-plane
-			transformed_vertex.z -= camera_position.z;
+			transformed_vertex.z += 5;
 
 			// Lagre punktene i array for transformerte punkter
 			transformed_vertices[j] = transformed_vertex;
 		}
 
-		// TODO: Sjekk om flaten skal vises eller gjemmes bort
-		//
+		triangle_t projected_triangle;
+
+		// TODO: Backface culling: Sjekk om flaten skal vises eller gjemmes bort
+		// Finn BA: b1-a1, b2-a2, b3-a3
+		vec3_t vec_BA = {
+			.x = transformed_vertices[1].x - transformed_vertices[0].x,
+			.y = transformed_vertices[1].y - transformed_vertices[0].y,
+			.z = transformed_vertices[1].z - transformed_vertices[0].z
+		};
+		// Finn CA: c1-a1, c2-a2, c3-a3
+		vec3_t vec_CA = {
+			.x = transformed_vertices[2].x - transformed_vertices[0].x,
+			.y = transformed_vertices[2].y - transformed_vertices[0].y,
+			.z = transformed_vertices[2].z - transformed_vertices[0].z
+		};
+
+		// Finn kryssproduktet mellom dem (venstre-hånd koordinatsystem)
+		vec3_t vec_N = vec3_cross(vec_BA, vec_CA);
+
+		// Finn kamera strålevektoren
+		vec3_t camera_ray = vec3_sub(camera_position, transformed_vertices[0]);
+
+		// Punktproduktet mellom kamerastrålen og normalen N
+		float dot = vec3_dot(vec_N, camera_ray);
+
+		// Sjekk om flaten skal vises eller gjemmes bort
+		if (dot <= 0) {
+			continue;
+		}
 
 		// Loop gjennom alle 3 punktene av den nåværende flaten og *projiser* dem
 		for (int j = 0; j < 3; j++) {
