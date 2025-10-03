@@ -22,6 +22,9 @@ triangle_t* triangles_to_render = NULL;
 ////////////////////////////////////////////////////////////////////////////////
 // Global variables for execution status and game loop
 ////////////////////////////////////////////////////////////////////////////////
+int frame_count = 0;
+int fps_timer = 0;
+
 bool is_running = false;
 int previous_frame_time = 0;
 
@@ -85,6 +88,14 @@ void update(void) {
 	}
 
 	previous_frame_time = SDL_GetTicks(); // Number of ms since game has started
+
+	// FPS kalkulering
+	frame_count++;
+	if (SDL_GetTicks() - fps_timer >= 1000) { // Vi har passert 1 sekund
+        printf("FPS: %d\n", frame_count);
+        frame_count = 0;
+        fps_timer = SDL_GetTicks();
+    }
 	
 	// Initialize the array of triangles to render
 	triangles_to_render = NULL;
@@ -185,7 +196,7 @@ void render(void) {
 	// Loop gjennom og rendre alle projekterte triangler (faces)
 	int num_triangles = array_length(triangles_to_render);
 
-	printf("%d faces rendered\n", num_triangles);
+	//printf("%d faces rendered\n", num_triangles);
 
 	for (int i = 0; i < num_triangles; i++) {
 		triangle_t face = triangles_to_render[i];
@@ -228,12 +239,17 @@ void free_resources(void) {
 }
 
 int main(void) {
-	
+
 	initialize_window();
 
 	is_running = initialize_window();
 
 	setup();
+
+	// Initialize the timer used for FPS calculations
+    fps_timer = SDL_GetTicks();
+
+	// Game loop
 
 	while (is_running) {
 		process_input();
