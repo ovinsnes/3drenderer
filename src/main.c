@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <SDL2/SDL.h>
+#include <SDL.h>
+#include <SDL_ttf.h>
 #include <time.h>
 
 #include "array.h"
@@ -22,8 +23,10 @@ triangle_t* triangles_to_render = NULL;
 ////////////////////////////////////////////////////////////////////////////////
 // Global variables for execution status and game loop
 ////////////////////////////////////////////////////////////////////////////////
+TTF_Font* font = NULL;
 int frame_count = 0;
 int fps_timer = 0;
+int current_fps = 0;
 
 bool is_running = false;
 int previous_frame_time = 0;
@@ -58,6 +61,16 @@ void setup(void) {
 	end = clock();
 	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 	printf("load_obj_data() took %f seconds to execute\n", cpu_time_used);
+
+	// Initialize SDL_ttf
+	if (TTF_Init() != 0) {
+	    fprintf(stderr, "Error initializing SDL_ttf: %s\n", TTF_GetError());
+	}
+	font = TTF_OpenFont("/System/Library/Fonts/Helvetica.ttc", 24);
+	if (font == NULL) {
+        fprintf(stderr, "Error loading font: %s\n", TTF_GetError());
+    }
+
 }
 
 void process_input(void) {
@@ -80,19 +93,19 @@ void process_input(void) {
 void update(void) {
 	// We "lock" execution until FRAME_TARGET_TIME has passed to create a
 	// consistent frame time
-	int time_to_wait = FRAME_TARGET_TIME - (SDL_GetTicks() - previous_frame_time);
-
-	// Only delay execution if we are running too fast
-	if (time_to_wait > 0 && time_to_wait <= FRAME_TARGET_TIME) {
-		SDL_Delay(time_to_wait);
-	}
+//	int time_to_wait = FRAME_TARGET_TIME - (SDL_GetTicks() - previous_frame_time);
+//
+//	// Only delay execution if we are running too fast
+//	if (time_to_wait > 0 && time_to_wait <= FRAME_TARGET_TIME) {
+//		SDL_Delay(time_to_wait);
+//	}
 
 	previous_frame_time = SDL_GetTicks(); // Number of ms since game has started
 
 	// FPS kalkulering
 	frame_count++;
 	if (SDL_GetTicks() - fps_timer >= 1000) { // Vi har passert 1 sekund
-        printf("FPS: %d\n", frame_count);
+	    current_fps = frame_count;
         frame_count = 0;
         fps_timer = SDL_GetTicks();
     }
@@ -226,6 +239,21 @@ void render(void) {
 	/* Vi rensker colorbufferen før hver frame rendres */
 	clear_color_buffer(0xFF000000); // Svart
 
+	// Render FPS counter
+	char fps_text[10];
+	sprintf(fps_text, "FPS: %d", current_fps);
+    SDL_Color white = {255, 255, 255};
+    SDL_Surface* text_surface = TTF_RenderText_Solid(font, fps_text, white);
+    if (text_surface) {
+        SDL_Texture* text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
+        if (text_texture) {
+            SDL_Rect text_rect = {10, 10, text_surface->w, text_surface->h};
+            SDL_RenderCopy(renderer, text_texture, NULL, &text_rect);
+            SDL_DestroyTexture(text_texture);
+        }
+        SDL_FreeSurface(text_surface);
+    }
+
 	SDL_RenderPresent(renderer);
 }
 
@@ -239,9 +267,6 @@ void free_resources(void) {
 }
 
 int main(void) {
-
-	initialize_window();
-
 	is_running = initialize_window();
 
 	setup();
