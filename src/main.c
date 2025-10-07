@@ -22,6 +22,8 @@
 triangle_t* triangles_to_render = NULL;
 
 arena_t global_arena;
+int max_triangles = 0;
+int triangle_count = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Global variables for execution status and game loop
@@ -65,6 +67,10 @@ void setup(void) {
 	end = clock();
 	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 	printf("load_obj_data() took %f seconds to execute\n", cpu_time_used);
+
+	// Pre-alloker minne for hele trådmodellen
+	max_triangles = array_length(mesh.faces);
+	triangles_to_render = (triangle_t*) arena_alloc(&global_arena, max_triangles * sizeof(triangle_t));
 
 	// Initialize SDL_ttf
 	if (TTF_Init() != 0) {
@@ -114,14 +120,13 @@ void update(void) {
         fps_timer = SDL_GetTicks();
     }
 	
-	// Initialize the array of triangles to render
-	triangles_to_render = NULL;
+	triangle_count = 0;	// Reset counter
 
 	mesh.rotation.x += 0.01; // Speed of rotation
 	mesh.rotation.y += 0.01; // Speed of rotation
 	mesh.rotation.z += 0.01; // Speed of rotation
 
-	// Loop all triangle faces of out mesh
+	// Loop all triangle faces of our mesh
 	int num_faces = array_length(mesh.faces);
 
 	for (int i = 0; i < num_faces; i++) {
@@ -200,7 +205,9 @@ void update(void) {
 		}
 
 		// Save the transformed and projected triangle in the array of triangles to render
-		array_push(triangles_to_render, projected_triangle);
+		//array_push(triangles_to_render, projected_triangle);
+		triangles_to_render[triangle_count++] = projected_triangle;
+		
 	}
 }
 
@@ -211,7 +218,7 @@ void render(void) {
 	draw_grid();
 
 	// Loop gjennom og rendre alle projekterte triangler (faces)
-	int num_triangles = array_length(triangles_to_render);
+	int num_triangles = triangle_count;
 
 	//printf("%d faces rendered\n", num_triangles);
 
@@ -234,9 +241,6 @@ void render(void) {
 				0xFF00FF00
 		);
 	}
-
-	// Clear the array of triangles to render every frame loop
-	array_free(triangles_to_render);
 
 	render_color_buffer();
 
