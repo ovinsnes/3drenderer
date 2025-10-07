@@ -10,15 +10,18 @@
 #include "vector.h"
 #include "mesh.h"
 #include "triangle.h"
+#include "arena.h"
 	
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386) || defined(_M_IX86)
 #include <immintrin.h>
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
-// Array of triangles that should be rendered frame by frame
+// Pre-allokert håndtering av minne
 ////////////////////////////////////////////////////////////////////////////////
 triangle_t* triangles_to_render = NULL;
+
+arena_t global_arena;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Global variables for execution status and game loop
@@ -39,7 +42,8 @@ float fov_factor = 640;
 ////////////////////////////////////////////////////////////////////////////////
 void setup(void) {
 	// Alloker nødvendig antall bytes i minnet for fargebuffer
-	color_buffer = (uint32_t*) malloc(sizeof(uint32_t) * window_width * window_height);
+	arena_init(&global_arena, 64 * 1024 * 1024);	// 64MB
+	color_buffer = (uint32_t*) arena_alloc(&global_arena, sizeof(uint32_t) * window_width * window_height);
 
 	// Lage en SDL texture for å vise fargebufferet
 	color_buffer_texture = SDL_CreateTexture(
@@ -57,7 +61,7 @@ void setup(void) {
 	double cpu_time_used;
 
 	start = clock();
-	load_obj_file_data("./assets/diamond.obj");
+	load_obj_file_data("./assets/bunny.obj");
 	end = clock();
 	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 	printf("load_obj_data() took %f seconds to execute\n", cpu_time_used);
