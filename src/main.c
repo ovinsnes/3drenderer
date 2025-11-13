@@ -63,7 +63,7 @@ void setup(void) {
 	double cpu_time_used;
 
 	start = clock();
-	load_obj_file_data("./assets/bunny.obj");
+	load_obj_file_data("./assets/diamond.obj");
 	end = clock();
 	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 	printf("load_obj_data() took %f seconds to execute\n", cpu_time_used);
@@ -225,10 +225,21 @@ void render(void) {
 	for (int i = 0; i < num_triangles; i++) {
 		triangle_t face = triangles_to_render[i];
 
-		// Draw vertex points
-		draw_rect(face.points[0].x, face.points[0].y, 3, 3, 0xFFFFFF00);
-		draw_rect(face.points[1].x, face.points[1].y, 3, 3, 0xFFFFFF00);
-		draw_rect(face.points[2].x, face.points[2].y, 3, 3, 0xFFFFFF00);
+//		// Draw vertex points
+//		draw_rect(face.points[0].x, face.points[0].y, 3, 3, 0xFFFFFF00);
+//		draw_rect(face.points[1].x, face.points[1].y, 3, 3, 0xFFFFFF00);
+//		draw_rect(face.points[2].x, face.points[2].y, 3, 3, 0xFFFFFF00);
+
+		// Draw filled triangle
+		draw_filled_triangle(
+				face.points[0].x, 
+				face.points[0].y, 
+				face.points[1].x, 
+				face.points[1].y,
+				face.points[2].x, 
+				face.points[2].y,
+				0xFFFFFFFF
+		);
 
 		// Draw unfilled triangle
 		draw_triangle(
@@ -238,7 +249,7 @@ void render(void) {
 				face.points[1].y,
 				face.points[2].x, 
 				face.points[2].y,
-				0xFF00FF00
+				0xFF000000
 		);
 	}
 
