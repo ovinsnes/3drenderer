@@ -36,6 +36,7 @@ bool show_rendermode_message = false;
 int rendermode_message_timer = 0;
 
 SDL_Color white = {255, 255, 255};
+SDL_Color green = {0, 255, 0};
 
 bool is_running = false;
 int previous_frame_time = 0;
@@ -264,7 +265,7 @@ void render(void) {
 //		draw_rect(face.points[1].x, face.points[1].y, 3, 3, 0xFFFFFF00);
 //		draw_rect(face.points[2].x, face.points[2].y, 3, 3, 0xFFFFFF00);
 
-		if (draw_filled_polygons || draw_filled_wireframe) {
+		if (draw_filled_polygons) {
 			// Draw filled triangle
 			draw_filled_triangle(
 					face.points[0].x, 
@@ -294,6 +295,15 @@ void render(void) {
 		}
 
 		if (draw_filled_wireframe) {
+			draw_filled_triangle(
+					face.points[0].x, 
+					face.points[0].y, 
+					face.points[1].x, 
+					face.points[1].y,
+					face.points[2].x, 
+					face.points[2].y,
+					0xFFFFFFFF
+			);
 			draw_triangle(
 					face.points[0].x, 
 					face.points[0].y, 
@@ -328,6 +338,20 @@ void render(void) {
         SDL_FreeSurface(text_surface);
     }
 
+	// Vise infotekst om render modus på bunnen
+	char render_modes[300];
+	sprintf(render_modes, "Press '1' for wireframe toggle || Press '2' for filled triangles || Press '3' for both wireframe AND filled polys || Press '4' for backface culling");
+	SDL_Surface* info_surface = TTF_RenderText_Solid(font, render_modes, green);
+    if (info_surface) {
+        SDL_Texture* info_texture = SDL_CreateTextureFromSurface(renderer, info_surface);
+        if (info_surface) {
+            SDL_Rect text_rect = {10, window_height - 100, info_surface->w, info_surface->h};
+            SDL_RenderCopy(renderer, info_texture, NULL, &text_rect);
+            SDL_DestroyTexture(info_texture);
+        }
+        SDL_FreeSurface(info_surface);
+    }
+
     // Render wireframe status melding (hvs aktiv)
     if (show_rendermode_message && font) {
 		// Sjekk om 3 sekunder har gått
@@ -344,7 +368,7 @@ void render(void) {
 					sprintf(rendermode_text, "Filled polygons toggled %s", draw_filled_polygons ? "ON" : "OFF");
 					break;
 				case 3:
-					sprintf(rendermode_text, "Filled polygons AND wireframe toggled %s", draw_filled_polygons ? "ON" : "OFF");
+					sprintf(rendermode_text, "Filled polygons AND wireframe toggled %s", draw_filled_wireframe ? "ON" : "OFF");
 					break;
 				case 4:
 					sprintf(rendermode_text, "Backface culling toggled %s", apply_culling ? "ON" : "OFF");
