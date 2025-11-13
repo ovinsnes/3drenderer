@@ -32,9 +32,20 @@ TTF_Font* font = NULL;
 int frame_count = 0;
 int fps_timer = 0;
 int current_fps = 0;
+bool show_rendermode_message = false;
+int rendermode_message_timer = 0;
+
+SDL_Color white = {255, 255, 255};
 
 bool is_running = false;
 int previous_frame_time = 0;
+
+bool draw_wireframe = true;
+bool draw_filled_polygons = false;
+bool draw_filled_wireframe = false;
+char key_pressed;
+
+bool apply_culling = false;
 
 vec3_t camera_position = { .x = 0, .y = 0, .z = 0 };
 float fov_factor = 640;
@@ -63,7 +74,7 @@ void setup(void) {
 	double cpu_time_used;
 
 	start = clock();
-	load_obj_file_data("./assets/diamond.obj");
+	load_obj_file_data("./assets/bunny.obj");
 	end = clock();
 	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 	printf("load_obj_data() took %f seconds to execute\n", cpu_time_used);
@@ -94,6 +105,30 @@ void process_input(void) {
 		case SDL_KEYDOWN:
 			if (event.key.keysym.sym == SDLK_ESCAPE)
 				is_running = false;
+			if (event.key.keysym.sym == SDLK_1) {
+                draw_wireframe = !draw_wireframe;
+				key_pressed = 1;
+                show_rendermode_message = true;
+                rendermode_message_timer = SDL_GetTicks();
+			}
+			if (event.key.keysym.sym == SDLK_2) {
+				draw_filled_polygons = !draw_filled_polygons;
+				key_pressed = 2;
+				show_rendermode_message = true;
+				rendermode_message_timer = SDL_GetTicks();
+			}
+			if (event.key.keysym.sym == SDLK_3) {
+				draw_filled_wireframe = !draw_filled_wireframe;
+				key_pressed = 3;
+				show_rendermode_message = true;
+				rendermode_message_timer = SDL_GetTicks();
+			}
+			if (event.key.keysym.sym == SDLK_4) {
+				apply_culling = !apply_culling;
+				key_pressed = 4;
+				show_rendermode_message = true;
+				rendermode_message_timer = SDL_GetTicks();
+			}
 			break;
 	}
 }
@@ -185,7 +220,6 @@ void update(void) {
 		// Punktproduktet mellom kamerastrålen og normalen N
 		float dot = vec3_dot(normal, camera_ray);
 
-		bool apply_culling = true;
 
 		// Sjekk om flaten skal vises eller gjemmes bort
 		if (dot <= 0 && apply_culling) {
@@ -230,39 +264,60 @@ void render(void) {
 //		draw_rect(face.points[1].x, face.points[1].y, 3, 3, 0xFFFFFF00);
 //		draw_rect(face.points[2].x, face.points[2].y, 3, 3, 0xFFFFFF00);
 
-		// Draw filled triangle
-		draw_filled_triangle(
-				face.points[0].x, 
-				face.points[0].y, 
-				face.points[1].x, 
-				face.points[1].y,
-				face.points[2].x, 
-				face.points[2].y,
-				0xFFFFFFFF
-		);
+		if (draw_filled_polygons || draw_filled_wireframe) {
+			// Draw filled triangle
+			draw_filled_triangle(
+					face.points[0].x, 
+					face.points[0].y, 
+					face.points[1].x, 
+					face.points[1].y,
+					face.points[2].x, 
+					face.points[2].y,
+					0xFFFFFFFF
+			);
+		}
 
-		// Draw unfilled triangle
-		draw_triangle(
-				face.points[0].x, 
-				face.points[0].y, 
-				face.points[1].x, 
-				face.points[1].y,
-				face.points[2].x, 
-				face.points[2].y,
-				0xFF000000
-		);
+		if (draw_wireframe) {
+			// Draw unfilled triangle
+			draw_triangle(
+					face.points[0].x, 
+					face.points[0].y, 
+					face.points[1].x, 
+					face.points[1].y,
+					face.points[2].x, 
+					face.points[2].y,
+					0xFFFFFFFF
+			);
+			draw_pixel(face.points[0].x, face.points[0].y, 0xFFFF0000);
+			draw_pixel(face.points[1].x, face.points[1].y, 0xFFFF0000);
+			draw_pixel(face.points[2].x, face.points[2].y, 0xFFFF0000);
+		}
+
+		if (draw_filled_wireframe) {
+			draw_triangle(
+					face.points[0].x, 
+					face.points[0].y, 
+					face.points[1].x, 
+					face.points[1].y,
+					face.points[2].x, 
+					face.points[2].y,
+					0xFF000000
+			);
+			draw_pixel(face.points[0].x, face.points[0].y, 0xFFFF0000);
+			draw_pixel(face.points[1].x, face.points[1].y, 0xFFFF0000);
+			draw_pixel(face.points[2].x, face.points[2].y, 0xFFFF0000);
+
+		}
 	}
 
 	render_color_buffer();
-
 	/* Vi rensker colorbufferen før hver frame rendres */
 	clear_color_buffer(0xFF000000); // Svart
 
 	// Render FPS counter
 	char fps_text[10];
 	sprintf(fps_text, "FPS: %d", current_fps);
-    SDL_Color white = {255, 255, 255};
-    SDL_Surface* text_surface = TTF_RenderText_Solid(font, fps_text, white);
+	SDL_Surface* text_surface = TTF_RenderText_Solid(font, fps_text, white);
     if (text_surface) {
         SDL_Texture* text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
         if (text_texture) {
@@ -273,6 +328,44 @@ void render(void) {
         SDL_FreeSurface(text_surface);
     }
 
+    // Render wireframe status melding (hvs aktiv)
+    if (show_rendermode_message && font) {
+		// Sjekk om 3 sekunder har gått
+		if (SDL_GetTicks() - rendermode_message_timer >= 3000) {
+			show_rendermode_message = false;
+		} else {
+			char rendermode_text[50];
+
+			switch (key_pressed) {
+				case 1:
+					sprintf(rendermode_text, "Wireframe toggled %s", draw_wireframe ? "ON" : "OFF");
+					break;
+				case 2:
+					sprintf(rendermode_text, "Filled polygons toggled %s", draw_filled_polygons ? "ON" : "OFF");
+					break;
+				case 3:
+					sprintf(rendermode_text, "Filled polygons AND wireframe toggled %s", draw_filled_polygons ? "ON" : "OFF");
+					break;
+				case 4:
+					sprintf(rendermode_text, "Backface culling toggled %s", apply_culling ? "ON" : "OFF");
+					break;
+
+
+			}
+			SDL_Surface* wireframe_surface = TTF_RenderText_Solid(font, rendermode_text, white);
+			if (wireframe_surface) {
+				SDL_Texture* wireframe_texture = SDL_CreateTextureFromSurface(renderer, wireframe_surface);
+				if (wireframe_texture) {
+					SDL_Rect wireframe_rect = {10, 50, wireframe_surface->w, wireframe_surface->h};
+					SDL_RenderCopy(renderer, wireframe_texture, NULL, &wireframe_rect);
+					SDL_DestroyTexture(wireframe_texture);
+				}
+				SDL_FreeSurface(wireframe_surface);
+			}
+
+		}
+    }
+
 	SDL_RenderPresent(renderer);
 }
 
@@ -280,6 +373,10 @@ void render(void) {
 // Free memory that was dynamically allocated by the program
 ////////////////////////////////////////////////////////////////////////////////
 void free_resources(void) {
+if (font) {
+        TTF_CloseFont(font);
+    }
+    TTF_Quit();
 	free(color_buffer);
 	array_free(mesh.faces);
 	array_free(mesh.vertices);
