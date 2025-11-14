@@ -46,13 +46,14 @@ bool draw_filled_polygons = false;
 bool draw_filled_wireframe = false;
 char key_pressed;
 
-enum render_method {
+enum render_modes {
 	RENDER_WIRE,
+	RENDER_WIRE_VERTEX,
 	RENDER_FILL_TRIANGLE,
 	RENDER_FILL_TRIANGLE_WIRE
-} render_method;
+} render_modes;
 
-bool apply_culling = false;
+bool apply_culling = true;
 
 vec3_t camera_position = { .x = 0, .y = 0, .z = 0 };
 float fov_factor = 640;
@@ -64,6 +65,7 @@ void setup(void) {
 	// Alloker nødvendig antall bytes i minnet for fargebuffer
 	arena_init(&global_arena, 64 * 1024 * 1024);	// 64MB
 	color_buffer = (uint32_t*) arena_alloc(&global_arena, sizeof(uint32_t) * window_width * window_height);
+	render_modes = RENDER_WIRE;
 
 	// Lage en SDL texture for å vise fargebufferet
 	color_buffer_texture = SDL_CreateTexture(
@@ -113,27 +115,32 @@ void process_input(void) {
 			if (event.key.keysym.sym == SDLK_ESCAPE)
 				is_running = false;
 			if (event.key.keysym.sym == SDLK_1) {
-                draw_wireframe = !draw_wireframe;
+                render_modes = RENDER_WIRE_VERTEX;
 				key_pressed = 1;
                 show_rendermode_message = true;
                 rendermode_message_timer = SDL_GetTicks();
 			}
 			if (event.key.keysym.sym == SDLK_2) {
-				draw_filled_polygons = !draw_filled_polygons;
-				render_method = RENDER_WIRE;
+				render_modes = RENDER_WIRE;
 				key_pressed = 2;
 				show_rendermode_message = true;
 				rendermode_message_timer = SDL_GetTicks();
 			}
 			if (event.key.keysym.sym == SDLK_3) {
-				draw_filled_wireframe = !draw_filled_wireframe;
+				render_modes = RENDER_FILL_TRIANGLE;
 				key_pressed = 3;
 				show_rendermode_message = true;
 				rendermode_message_timer = SDL_GetTicks();
 			}
 			if (event.key.keysym.sym == SDLK_4) {
-				apply_culling = !apply_culling;
+				render_modes = RENDER_FILL_TRIANGLE_WIRE;
 				key_pressed = 4;
+				show_rendermode_message = true;
+				rendermode_message_timer = SDL_GetTicks();
+			}
+			if (event.key.keysym.sym == SDLK_5) {
+				apply_culling = !apply_culling;
+				key_pressed = 5;
 				show_rendermode_message = true;
 				rendermode_message_timer = SDL_GetTicks();
 			}
@@ -276,12 +283,8 @@ void render(void) {
 	for (int i = 0; i < num_triangles; i++) {
 		triangle_t face = triangles_to_render[i];
 
-//		// Draw vertex points
-//		draw_rect(face.points[0].x, face.points[0].y, 3, 3, 0xFFFFFF00);
-//		draw_rect(face.points[1].x, face.points[1].y, 3, 3, 0xFFFFFF00);
-//		draw_rect(face.points[2].x, face.points[2].y, 3, 3, 0xFFFFFF00);
 
-		if (draw_filled_polygons) {
+		if (render_modes == RENDER_FILL_TRIANGLE || render_modes == RENDER_FILL_TRIANGLE_WIRE) {
 			// Draw filled triangle
 			draw_filled_triangle(
 					face.points[0].x, 
@@ -294,7 +297,7 @@ void render(void) {
 			);
 		}
 
-		if (draw_wireframe) {
+		if (render_modes == RENDER_WIRE || render_modes == RENDER_WIRE_VERTEX || render_modes == RENDER_FILL_TRIANGLE_WIRE) {
 			// Draw unfilled triangle
 			draw_triangle(
 					face.points[0].x, 
@@ -305,34 +308,13 @@ void render(void) {
 					face.points[2].y,
 					0xFFFFFFFF
 			);
-			draw_pixel(face.points[0].x, face.points[0].y, 0xFFFF0000);
-			draw_pixel(face.points[1].x, face.points[1].y, 0xFFFF0000);
-			draw_pixel(face.points[2].x, face.points[2].y, 0xFFFF0000);
 		}
 
-		if (draw_filled_wireframe) {
-			draw_filled_triangle(
-					face.points[0].x, 
-					face.points[0].y, 
-					face.points[1].x, 
-					face.points[1].y,
-					face.points[2].x, 
-					face.points[2].y,
-					0xFFFFFFFF
-			);
-			draw_triangle(
-					face.points[0].x, 
-					face.points[0].y, 
-					face.points[1].x, 
-					face.points[1].y,
-					face.points[2].x, 
-					face.points[2].y,
-					0xFF000000
-			);
-			draw_pixel(face.points[0].x, face.points[0].y, 0xFFFF0000);
-			draw_pixel(face.points[1].x, face.points[1].y, 0xFFFF0000);
-			draw_pixel(face.points[2].x, face.points[2].y, 0xFFFF0000);
-
+		if (render_modes == RENDER_WIRE_VERTEX) {
+			// Draw vertex points
+			draw_rect(face.points[0].x, face.points[0].y, 3, 3, 0xFFFF0000);
+			draw_rect(face.points[1].x, face.points[1].y, 3, 3, 0xFFFF0000);
+			draw_rect(face.points[2].x, face.points[2].y, 3, 3, 0xFFFF0000);
 		}
 	}
 
@@ -355,9 +337,16 @@ void render(void) {
     }
 
 	// Vise infotekst om render modus på bunnen
-	char render_modes[300];
-	sprintf(render_modes, "Press '1' for wireframe toggle || Press '2' for filled triangles || Press '3' for both wireframe AND filled polys || Press '4' for backface culling");
-	SDL_Surface* info_surface = TTF_RenderText_Solid(font, render_modes, green);
+	char render_info_text[300];
+	sprintf(
+			render_info_text, 
+			"Press '1' for wireframe and vertex toggle || "
+			"Press '2' for wireframe only || "
+			"Press '3' for filled triangles || " 
+			"Press '4' for filled triangles with wireframe || "
+			"Press '5' for backface culling toggle"
+			);
+	SDL_Surface* info_surface = TTF_RenderText_Solid(font, render_info_text, green);
     if (info_surface) {
         SDL_Texture* info_texture = SDL_CreateTextureFromSurface(renderer, info_surface);
         if (info_surface) {
@@ -378,15 +367,18 @@ void render(void) {
 
 			switch (key_pressed) {
 				case 1:
-					sprintf(rendermode_text, "Wireframe toggled %s", draw_wireframe ? "ON" : "OFF");
+					sprintf(rendermode_text, "Rendering wireframe and vertices");
 					break;
 				case 2:
-					sprintf(rendermode_text, "Filled polygons toggled %s", draw_filled_polygons ? "ON" : "OFF");
+					sprintf(rendermode_text, "Rendering wireframe only");
 					break;
 				case 3:
-					sprintf(rendermode_text, "Filled polygons AND wireframe toggled %s", draw_filled_wireframe ? "ON" : "OFF");
+					sprintf(rendermode_text, "Rendering filled triangles");
 					break;
 				case 4:
+					sprintf(rendermode_text, "Rendering filled triangles with wireframe");
+					break;
+				case 5:
 					sprintf(rendermode_text, "Backface culling toggled %s", apply_culling ? "ON" : "OFF");
 					break;
 
