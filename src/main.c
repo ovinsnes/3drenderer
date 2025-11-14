@@ -46,6 +46,12 @@ bool draw_filled_polygons = false;
 bool draw_filled_wireframe = false;
 char key_pressed;
 
+enum render_method {
+	RENDER_WIRE,
+	RENDER_FILL_TRIANGLE,
+	RENDER_FILL_TRIANGLE_WIRE
+} render_method;
+
 bool apply_culling = false;
 
 vec3_t camera_position = { .x = 0, .y = 0, .z = 0 };
@@ -69,13 +75,13 @@ void setup(void) {
 	);
 
 	// Loads the cube values in the mesh data structure
-	//load_cube_mesh_data();
 
 	clock_t start, end;
 	double cpu_time_used;
 
 	start = clock();
-	load_obj_file_data("./assets/bunny.obj");
+	//load_obj_file_data("./assets/diamond.obj");
+	load_cube_mesh_data();
 	end = clock();
 	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 	printf("load_obj_data() took %f seconds to execute\n", cpu_time_used);
@@ -114,6 +120,7 @@ void process_input(void) {
 			}
 			if (event.key.keysym.sym == SDLK_2) {
 				draw_filled_polygons = !draw_filled_polygons;
+				render_method = RENDER_WIRE;
 				key_pressed = 2;
 				show_rendermode_message = true;
 				rendermode_message_timer = SDL_GetTicks();
@@ -192,7 +199,6 @@ void update(void) {
 			transformed_vertices[j] = transformed_vertex;
 		}
 
-		triangle_t projected_triangle;
 
 		// TODO: Backface culling: Sjekk om flaten skal vises eller gjemmes bort
 		// Finn BA: b1-a1, b2-a2, b3-a3
@@ -227,17 +233,27 @@ void update(void) {
 			continue;
 		}
 
+		vec2_t projected_points[3];
+
 		// Loop gjennom alle 3 punktene av den nåværende flaten og *projiser* dem
 		for (int j = 0; j < 3; j++) {
 			// Project the current vertex onto 2D space
-			vec2_t projected_point = project(transformed_vertices[j], fov_factor);
+			projected_points[j] = project(transformed_vertices[j], fov_factor);
 
 			// Scale and translate the projected points to the middle of the screen
-			projected_point.x += (window_width / 2);
-			projected_point.y += (window_height / 2);
+			projected_points[j].x += (window_width / 2);
+			projected_points[j].y += (window_height / 2);
 
-			projected_triangle.points[j] = projected_point;
 		}
+
+		triangle_t projected_triangle = {
+			.points = {
+				{ projected_points[0].x, projected_points[0].y },
+				{ projected_points[1].x, projected_points[1].y },
+				{ projected_points[2].x, projected_points[2].y },
+			},
+			.color = mesh_face.color
+		};
 
 		// Save the transformed and projected triangle in the array of triangles to render
 		//array_push(triangles_to_render, projected_triangle);
@@ -274,7 +290,7 @@ void render(void) {
 					face.points[1].y,
 					face.points[2].x, 
 					face.points[2].y,
-					0xFFFFFFFF
+					face.color
 			);
 		}
 

@@ -2,9 +2,9 @@
 #define VECTOR_H
 
 typedef struct {
-	float x;
-	float y;
-} vec2_t;
+	float x; // Offset 0: float x (4 bytes)
+	float y; // Offset 4: float y (4 bytes)
+} vec2_t;	 // Size: 8 bytes
 
 typedef struct {
 	float x;
