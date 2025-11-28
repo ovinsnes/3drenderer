@@ -11,6 +11,7 @@
 #include "mesh.h"
 #include "triangle.h"
 #include "arena.h"
+#include "matrix.h"
 	
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386) || defined(_M_IX86)
 #include <immintrin.h>
@@ -54,6 +55,7 @@ enum render_modes {
 } render_modes;
 
 bool apply_culling = true;
+bool matrix_transforms = false;
 
 vec3_t camera_position = { .x = 0, .y = 0, .z = 0 };
 float fov_factor = 640;
@@ -86,7 +88,7 @@ void setup(void) {
 	load_cube_mesh_data();
 	end = clock();
 	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-	printf("load_obj_data() took %f seconds to execute\n", cpu_time_used);
+	printf("load_obj_data() took %f milliseconds to execute\n", cpu_time_used * 1000.0);
 
 	// Pre-alloker minne for hele trådmodellen
 	max_triangles = array_length(mesh.faces);
@@ -144,6 +146,12 @@ void process_input(void) {
 				show_rendermode_message = true;
 				rendermode_message_timer = SDL_GetTicks();
 			}
+			if (event.key.keysym.sym == SDLK_6) {
+				matrix_transforms = !matrix_transforms;
+				key_pressed = 6;
+				show_rendermode_message = true;
+				rendermode_message_timer = SDL_GetTicks();
+			}
 			break;
 	}
 }
@@ -172,9 +180,21 @@ void update(void) {
 	
 	triangle_count = 0;	// Reset counter
 
+	// Endre rotasjon/skalering per frame
 	mesh.rotation.x += 0.01; // Speed of rotation
 	mesh.rotation.y += 0.01; // Speed of rotation
 	mesh.rotation.z += 0.01; // Speed of rotation
+//	mesh.scale.x += 0.002;
+//	mesh.scale.y += 0.001;
+	// Hold objektet på fast posisjon foran kameraet
+	mesh.translation.z = 5.0; // Sett objektet 5 enheter foran kameraet
+
+	// Lage en skalering, rotasjon, og translasjonsmatrise for å multiplisere punktene i meshet
+	mat4_t scale_matrix = mat4_make_scale(mesh.scale.x, mesh.scale.y, mesh.scale.z);
+	mat4_t translation_matrix = mat4_make_translation(mesh.translation.x, mesh.translation.y, mesh.translation.z);
+	mat4_t rotation_matrix_x = mat4_make_rotation_x(mesh.rotation.x);
+	mat4_t rotation_matrix_y = mat4_make_rotation_y(mesh.rotation.y);
+	mat4_t rotation_matrix_z = mat4_make_rotation_z(mesh.rotation.z);
 
 	// Loop all triangle faces of our mesh
 	int num_faces = array_length(mesh.faces);
@@ -183,61 +203,81 @@ void update(void) {
 		face_t mesh_face = mesh.faces[i];
 
 		vec3_t face_vertices[3];
+
 		// Array starts at index 0 so we compensate by subtracting 1
 		face_vertices[0] = mesh.vertices[mesh_face.a - 1];
 		face_vertices[1] = mesh.vertices[mesh_face.b - 1];
 		face_vertices[2] = mesh.vertices[mesh_face.c - 1];
 
 		vec3_t transformed_vertices[3];
+		vec4_t transformed_vec4s[3];
 
 		// Loop all 3 vertices of current face and apply *transformations*
 		for (int j = 0; j < 3; j++) {
 			vec3_t transformed_vertex = face_vertices[j];
+			vec4_t transformed_vec4;
 
-			// Rotate the points 0.1 degrees around y-axis for every frame update
-			transformed_vertex = vec3_rotate_x(transformed_vertex, mesh.rotation.x);
-			transformed_vertex = vec3_rotate_y(transformed_vertex, mesh.rotation.y);
-			transformed_vertex = vec3_rotate_z(transformed_vertex, mesh.rotation.z);
+			if (matrix_transforms) {
+				transformed_vec4 = vec4_from_vec3(face_vertices[j]);
+				// Appliser transformasjoner i riktig rekkefølge: Scale -> Rotate -> Translate
+				transformed_vec4 = mat4_mul_vec4(scale_matrix, transformed_vec4);
+				transformed_vec4 = mat4_mul_vec4(rotation_matrix_x, transformed_vec4);
+				transformed_vec4 = mat4_mul_vec4(rotation_matrix_y, transformed_vec4);
+				transformed_vec4 = mat4_mul_vec4(rotation_matrix_z, transformed_vec4);
+				transformed_vec4 = mat4_mul_vec4(translation_matrix, transformed_vec4);
+				transformed_vec4s[j] = transformed_vec4;
 
-			// Translate the vertex away from the camera in the z-plane
-			transformed_vertex.z += 5;
+				// Populer også transformed_vertices for avg_depth beregning
+				transformed_vertices[j] = vec3_from_vec4(transformed_vec4);
+			} else {
+				// Rotate the points 0.1 degrees around y-axis for every frame update
+				transformed_vertex = vec3_rotate_x(transformed_vertex, mesh.rotation.x);
+				transformed_vertex = vec3_rotate_y(transformed_vertex, mesh.rotation.y);
+				transformed_vertex = vec3_rotate_z(transformed_vertex, mesh.rotation.z);
 
-			// Lagre punktene i array for transformerte punkter
-			transformed_vertices[j] = transformed_vertex;
+				// Translate the vertex away from the camera in the z-plane
+				transformed_vertex.z += 5;
+				// Lagre punktene i array for transformerte punkter
+				transformed_vertices[j] = transformed_vertex;
+			}
 		}
 
 
-		// TODO: Backface culling: Sjekk om flaten skal vises eller gjemmes bort
-		// Finn BA: b1-a1, b2-a2, b3-a3
-		vec3_t vec_BA = {
-			.x = transformed_vertices[1].x - transformed_vertices[0].x,
-			.y = transformed_vertices[1].y - transformed_vertices[0].y,
-			.z = transformed_vertices[1].z - transformed_vertices[0].z
-		};
-		// Finn CA: c1-a1, c2-a2, c3-a3
-		vec3_t vec_CA = {
-			.x = transformed_vertices[2].x - transformed_vertices[0].x,
-			.y = transformed_vertices[2].y - transformed_vertices[0].y,
-			.z = transformed_vertices[2].z - transformed_vertices[0].z
-		};
-		vec3_normalize(&vec_BA);
-		vec3_normalize(&vec_CA);
+		if (apply_culling) {
+			vec3_t vector_a;
+			vec3_t vector_b;
+			vec3_t vector_c;
 
-		// Finn kryssproduktet mellom dem (venstre-hånd koordinatsystem)
-		vec3_t normal = vec3_cross(vec_BA, vec_CA);
-		// Normaliser normalen for planet
-		vec3_normalize(&normal);
+			if (matrix_transforms) {
+				vector_a = vec3_from_vec4(transformed_vec4s[0]);
+				vector_b = vec3_from_vec4(transformed_vec4s[1]);
+				vector_c = vec3_from_vec4(transformed_vec4s[2]);
+			} else {
+				vector_a = transformed_vertices[0];
+				vector_b = transformed_vertices[1];
+				vector_c = transformed_vertices[2];
+			}
+			vec3_t vector_ab = vec3_sub(vector_a, vector_b);
+			vec3_t vector_ac = vec3_sub(vector_a, vector_c);
 
-		// Finn kamera strålevektoren
-		vec3_t camera_ray = vec3_sub(camera_position, transformed_vertices[0]);
+			vec3_normalize(&vector_ab);
+			vec3_normalize(&vector_ac);
 
-		// Punktproduktet mellom kamerastrålen og normalen N
-		float dot = vec3_dot(normal, camera_ray);
+			// Finn kryssproduktet mellom dem (venstre-hånd koordinatsystem)
+			vec3_t normal = vec3_cross(vector_ab, vector_ac);
+			// Normaliser normalen for planet
+			vec3_normalize(&normal);
 
+			// Finn kamera strålevektoren
+			vec3_t camera_ray = vec3_sub(camera_position, vector_a);
 
-		// Sjekk om flaten skal vises eller gjemmes bort
-		if (dot <= 0 && apply_culling) {
-			continue;
+			// Punktproduktet mellom kamerastrålen og normalen N
+			float dot = vec3_dot(normal, camera_ray);
+
+			// Sjekk om flaten skal vises eller gjemmes bort
+			if (dot <= 0) {
+				continue;
+			}
 		}
 
 		vec2_t projected_points[3];
@@ -245,7 +285,12 @@ void update(void) {
 		// Loop gjennom alle 3 punktene av den nåværende flaten og *projiser* dem
 		for (int j = 0; j < 3; j++) {
 			// Project the current vertex onto 2D space
-			projected_points[j] = project(transformed_vertices[j], fov_factor);
+			if (matrix_transforms) {
+				vec3_t transformed_vec3 = vec3_from_vec4(transformed_vec4s[j]);
+				projected_points[j] = project(transformed_vec3, fov_factor);
+			} else {
+				projected_points[j] = project(transformed_vertices[j], fov_factor);
+			}
 
 			// Scale and translate the projected points to the middle of the screen
 			projected_points[j].x += (window_width / 2);
@@ -279,7 +324,7 @@ void update(void) {
 
 	// TODO OLE: Sort the triangles to render by their average z-value
 	// (average depth) after pushing them to memory buffer
-	bool pass = true;
+	bool pass = false;
 	while (pass) {
 		pass = false;
 		for (int i = 0; i < triangle_count; i++) {
@@ -360,6 +405,20 @@ void render(void) {
         SDL_FreeSurface(text_surface);
     }
 
+	// Render face counter (antal trekanter som rendres)
+	char face_count_text[50];
+	sprintf(face_count_text, "Faces: %d / %d", num_triangles, max_triangles);
+	SDL_Surface* face_surface = TTF_RenderText_Solid(font, face_count_text, white);
+    if (face_surface) {
+        SDL_Texture* face_texture = SDL_CreateTextureFromSurface(renderer, face_surface);
+        if (face_texture) {
+            SDL_Rect face_rect = {10, 40, face_surface->w, face_surface->h};
+            SDL_RenderCopy(renderer, face_texture, NULL, &face_rect);
+            SDL_DestroyTexture(face_texture);
+        }
+        SDL_FreeSurface(face_surface);
+    }
+
 	// Vise infotekst om render modus på bunnen
 	char render_info_text[300];
 	sprintf(
@@ -368,7 +427,8 @@ void render(void) {
 			"Press '2' for wireframe only || "
 			"Press '3' for filled triangles || " 
 			"Press '4' for filled triangles with wireframe || "
-			"Press '5' for backface culling toggle"
+			"Press '5' for backface culling toggle || "
+			"Press '6' for matrix transformations toggle"
 			);
 	SDL_Surface* info_surface = TTF_RenderText_Solid(font, render_info_text, green);
     if (info_surface) {
@@ -405,6 +465,9 @@ void render(void) {
 				case 5:
 					sprintf(rendermode_text, "Backface culling toggled %s", apply_culling ? "ON" : "OFF");
 					break;
+				case 6:
+					sprintf(rendermode_text, "Matrix transformations toggled %s", matrix_transforms ? "ON" : "OFF");
+					break;
 
 
 			}
@@ -412,7 +475,7 @@ void render(void) {
 			if (wireframe_surface) {
 				SDL_Texture* wireframe_texture = SDL_CreateTextureFromSurface(renderer, wireframe_surface);
 				if (wireframe_texture) {
-					SDL_Rect wireframe_rect = {10, 50, wireframe_surface->w, wireframe_surface->h};
+					SDL_Rect wireframe_rect = {10, 80, wireframe_surface->w, wireframe_surface->h};
 					SDL_RenderCopy(renderer, wireframe_texture, NULL, &wireframe_rect);
 					SDL_DestroyTexture(wireframe_texture);
 				}
