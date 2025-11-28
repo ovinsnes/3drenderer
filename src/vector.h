@@ -17,7 +17,7 @@ typedef struct {
 	vec3_t rotation;
 } camera_t;
 
-typedef struct {
+typedef struct __attribute__((aligned(16))) {
 	float x, y, z, w;
 } vec4_t;
 

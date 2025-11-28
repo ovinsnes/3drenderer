@@ -37,6 +37,39 @@ vec4_t mat4_mul_vec4(mat4_t m, vec4_t v) {
 	return res;
 }
 
+#ifdef __ARM_NEON
+#include <arm_neon.h>
+
+// SIMD-versjon - dot product med pair-wise add
+vec4_t mat4_mul_vec4_simd(mat4_t m, vec4_t v) {
+	// Last vektor i SIMD-register
+	float32x4_t vec = vld1q_f32(&v.x);
+
+	// Last hver rad av matrisen
+	float32x4_t row0 = vld1q_f32(&m.m[0][0]);
+	float32x4_t row1 = vld1q_f32(&m.m[1][0]);
+	float32x4_t row2 = vld1q_f32(&m.m[2][0]);
+	float32x4_t row3 = vld1q_f32(&m.m[3][0]);
+
+	// Element-wise multiplikasjon + FMA pattern
+	// Bruk FMA for å kombinere multiply og add i én instruksjon
+	float32x4_t prod0 = vmulq_f32(row0, vec);
+	float32x4_t prod1 = vmulq_f32(row1, vec);
+	float32x4_t prod2 = vmulq_f32(row2, vec);
+	float32x4_t prod3 = vmulq_f32(row3, vec);
+
+	// Pair-wise add for dot product (2 rounds)
+	float32x4_t sum01 = vpaddq_f32(prod0, prod1);
+	float32x4_t sum23 = vpaddq_f32(prod2, prod3);
+	float32x4_t result = vpaddq_f32(sum01, sum23);
+
+	// Lagre resultat
+	vec4_t res;
+	vst1q_f32(&res.x, result);
+	return res;
+}
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////
 /// 4x4 translasjonsmatrise
 /////////////////////////////////////////////////////////////////////////////////
@@ -105,4 +138,34 @@ mat4_t mat4_mul_mat4(mat4_t a, mat4_t b) {
 		}
 	}
 	return m;
+}
+
+mat4_t mat4_make_perspective(float fov, float aspect, float znear, float zfar) {
+	// | (h/w)*1/tan(fov/2)			0		0					0   |   |x|
+	// |				0	1/tan(fov/2)	0			        0	|   |y|
+	// |				0			0  zf/(zf-zn)  (-zf*zn)/(zf-zn) | * |z|
+	// |				0			0		1					0	|   |w|<--!
+	mat4_t m = {{{ 0 }}};
+	m.m[0][0] = aspect * (1 / tan(fov / 2));
+	m.m[1][1] = 1 / tan(fov / 2);
+	m.m[2][2] = zfar / (zfar - znear);
+	m.m[2][3] = (-zfar * znear) / (zfar - znear);
+	m.m[3][2] = 1.0; // Brukes for å lagre den opprinnelige z-verdien i _w_
+					 // posisjonen til 4D-vektoren
+	return m;
+}
+
+vec4_t mat4_mul_vec4_project(mat4_t mat_proj, vec4_t v) {
+	// Multipliser med projeksjonsmatrisen
+	vec4_t res = mat4_mul_vec4(mat_proj, v);
+
+	// Dele perspektivet med den opprinnelige z-verdien vi har lagret i w.
+	// Dette steget utfører "normalisering i z-planet", altså at z verdien blir
+	// tvingt inn et sted mellom [0,1] (et sted mellom znear og zfar)
+	if (res.w != 0.0) {
+		res.x /= res.w;
+		res.y /= res.w;
+		res.z /= res.w;
+	}
+	return res;
 }

@@ -56,9 +56,11 @@ enum render_modes {
 
 bool apply_culling = true;
 bool matrix_transforms = false;
+bool simd = false;
 
 vec3_t camera_position = { .x = 0, .y = 0, .z = 0 };
 float fov_factor = 640;
+mat4_t proj_matrix;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Setup function to initialize variables and game objects
@@ -78,8 +80,14 @@ void setup(void) {
 			window_height
 	);
 
-	// Loads the cube values in the mesh data structure
+	// Initialiser projeksjonsmatrisen
+	float fov = M_PI / 3.0; // tilsvarende 180/3, eller 60 grader
+	float aspect = (float)window_height / (float)window_width;
+	float znear = 0.1;
+	float zfar = 100.0;
+	proj_matrix = mat4_make_perspective(fov, aspect, znear, zfar);
 
+	// Loads the cube values in the mesh data structure
 	clock_t start, end;
 	double cpu_time_used;
 
@@ -149,6 +157,12 @@ void process_input(void) {
 			if (event.key.keysym.sym == SDLK_6) {
 				matrix_transforms = !matrix_transforms;
 				key_pressed = 6;
+				show_rendermode_message = true;
+				rendermode_message_timer = SDL_GetTicks();
+			}
+			if (event.key.keysym.sym == SDLK_7) {
+				simd = !simd;
+				key_pressed = 7;
 				show_rendermode_message = true;
 				rendermode_message_timer = SDL_GetTicks();
 			}
@@ -229,7 +243,11 @@ void update(void) {
 			if (matrix_transforms) {
 				transformed_vec4 = vec4_from_vec3(face_vertices[j]);
 				// Multipliser verdensmatrisen med den opprinnelige vektoren
-				transformed_vec4 = mat4_mul_vec4(world_matrix, transformed_vec4);
+				if (simd) {
+					transformed_vec4 = mat4_mul_vec4_simd(world_matrix, transformed_vec4);
+				} else {
+					transformed_vec4 = mat4_mul_vec4(world_matrix, transformed_vec4);
+				}
 				transformed_vec4s[j] = transformed_vec4;
 
 				// Populer også transformed_vertices for avg_depth beregning
@@ -248,6 +266,9 @@ void update(void) {
 		}
 
 
+		////////////////////////////////////////////////////////////////////////////////
+		/// Backface Culling
+		///////////////////////////////////////////////////////////////////////////////
 		if (apply_culling) {
 			vec3_t vector_a;
 			vec3_t vector_b;
@@ -285,22 +306,31 @@ void update(void) {
 			}
 		}
 
+		///////////////////////////////////////////////////////////////////////////////
+		/// Projection
+		///////////////////////////////////////////////////////////////////////////////
 		vec2_t projected_points[3];
+		vec4_t mat_proj_points[3];
 
+		
 		// Loop gjennom alle 3 punktene av den nåværende flaten og *projiser* dem
 		for (int j = 0; j < 3; j++) {
 			// Project the current vertex onto 2D space
 			if (matrix_transforms) {
-				vec3_t transformed_vec3 = vec3_from_vec4(transformed_vec4s[j]);
-				projected_points[j] = project(transformed_vec3, fov_factor);
+				mat_proj_points[j] = mat4_mul_vec4_project(proj_matrix, transformed_vec4s[j]);
+				// Skaler opp i viewport
+				mat_proj_points[j].x *= (window_width / 4.0);
+				mat_proj_points[j].y *= (window_height / 4.0);
+				// Translate the projected points to the middle of the screen
+				mat_proj_points[j].x += (window_width / 2.0);
+				mat_proj_points[j].y += (window_height / 2.0);
+
 			} else {
 				projected_points[j] = project(transformed_vertices[j], fov_factor);
+				// Scale and translate the projected points to the middle of the screen
+				projected_points[j].x += (window_width / 2);
+				projected_points[j].y += (window_height / 2);
 			}
-
-			// Scale and translate the projected points to the middle of the screen
-			projected_points[j].x += (window_width / 2);
-			projected_points[j].y += (window_height / 2);
-
 		}
 
 		// Average z-value after transformation
@@ -310,17 +340,27 @@ void update(void) {
 				transformed_vertices[2].z
 				) / 3.0;
 
-		triangle_t projected_triangle = {
-			.points = {
-				{ projected_points[0].x, projected_points[0].y },
-				{ projected_points[1].x, projected_points[1].y },
-				{ projected_points[2].x, projected_points[2].y },
-			},
-			.color = mesh_face.color,
-			.avg_depth = avg_depth
-		};
+		triangle_t projected_triangle;
 
-		
+		if (matrix_transforms) {
+			projected_triangle.points[0].x = mat_proj_points[0].x;
+			projected_triangle.points[0].y = mat_proj_points[0].y;
+			projected_triangle.points[1].x = mat_proj_points[1].x;
+			projected_triangle.points[1].y = mat_proj_points[1].y;
+			projected_triangle.points[2].x = mat_proj_points[2].x;
+			projected_triangle.points[2].y = mat_proj_points[2].y;
+			projected_triangle.color = mesh_face.color;
+			projected_triangle.avg_depth = avg_depth;
+		} else {
+			projected_triangle.points[0].x = projected_points[0].x;
+			projected_triangle.points[0].y = projected_points[0].y;
+			projected_triangle.points[1].x = projected_points[1].x;
+			projected_triangle.points[1].y = projected_points[1].y;
+			projected_triangle.points[2].x = projected_points[2].x;
+			projected_triangle.points[2].y = projected_points[2].y;
+			projected_triangle.color = mesh_face.color;
+			projected_triangle.avg_depth = avg_depth;
+		}
 
 		// Save the transformed and projected triangle in the array of triangles to render
 		//array_push(triangles_to_render, projected_triangle);
@@ -472,6 +512,9 @@ void render(void) {
 					break;
 				case 6:
 					sprintf(rendermode_text, "Matrix transformations toggled %s", matrix_transforms ? "ON" : "OFF");
+					break;
+				case 7:
+					sprintf(rendermode_text, "SIMD toggled %s", simd ? "ON" : "OFF");
 					break;
 
 
