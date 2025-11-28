@@ -84,8 +84,8 @@ void setup(void) {
 	double cpu_time_used;
 
 	start = clock();
-	//load_obj_file_data("./assets/diamond.obj");
-	load_cube_mesh_data();
+	load_obj_file_data("./assets/bunny.obj");
+	//load_cube_mesh_data();
 	end = clock();
 	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 	printf("load_obj_data() took %f milliseconds to execute\n", cpu_time_used * 1000.0);
@@ -196,6 +196,15 @@ void update(void) {
 	mat4_t rotation_matrix_y = mat4_make_rotation_y(mesh.rotation.y);
 	mat4_t rotation_matrix_z = mat4_make_rotation_z(mesh.rotation.z);
 
+	// Verdensmatrise som kombinerer skalering, rotasjon og translasjon
+	mat4_t world_matrix = mat4_identity();
+	// Appliser transformasjoner i riktig rekkefølge: Scale -> Rotate -> Translate
+	world_matrix = mat4_mul_mat4(scale_matrix, world_matrix);
+	world_matrix = mat4_mul_mat4(rotation_matrix_x, world_matrix);
+	world_matrix = mat4_mul_mat4(rotation_matrix_y, world_matrix);
+	world_matrix = mat4_mul_mat4(rotation_matrix_z, world_matrix);
+	world_matrix = mat4_mul_mat4(translation_matrix, world_matrix);
+
 	// Loop all triangle faces of our mesh
 	int num_faces = array_length(mesh.faces);
 
@@ -219,12 +228,8 @@ void update(void) {
 
 			if (matrix_transforms) {
 				transformed_vec4 = vec4_from_vec3(face_vertices[j]);
-				// Appliser transformasjoner i riktig rekkefølge: Scale -> Rotate -> Translate
-				transformed_vec4 = mat4_mul_vec4(scale_matrix, transformed_vec4);
-				transformed_vec4 = mat4_mul_vec4(rotation_matrix_x, transformed_vec4);
-				transformed_vec4 = mat4_mul_vec4(rotation_matrix_y, transformed_vec4);
-				transformed_vec4 = mat4_mul_vec4(rotation_matrix_z, transformed_vec4);
-				transformed_vec4 = mat4_mul_vec4(translation_matrix, transformed_vec4);
+				// Multipliser verdensmatrisen med den opprinnelige vektoren
+				transformed_vec4 = mat4_mul_vec4(world_matrix, transformed_vec4);
 				transformed_vec4s[j] = transformed_vec4;
 
 				// Populer også transformed_vertices for avg_depth beregning
